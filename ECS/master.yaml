@@ -56,3 +56,56 @@ Resources:
         VPC: !GetAtt VPC.Outputs.VPC
         SecurityGroup: !GetAtt SecurityGroups.Outputs.ECSHostSecurityGroup
         Subnets: !GetAtt VPC.Outputs.PrivateSubnets
+
+  MongoService:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/cf-template-structured/services/reddit-mongo-service.yaml
+      Parameters:
+        VPC: !GetAtt VPC.Outputs.VPC
+        Cluster: !GetAtt ECS.Outputs.Cluster
+        DesiredCount: 1
+        Listener: !GetAtt ALB.Outputs.Listener
+        Path: /mongo
+
+  PostService:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/cf-template-structured/services/reddit-post-service.yaml
+      Parameters:
+        VPC: !GetAtt VPC.Outputs.VPC
+        Cluster: !GetAtt ECS.Outputs.Cluster
+        DesiredCount: 1
+        PostDatabaseUrl:
+          !Join ["/", [!GetAtt ALB.Outputs.LoadBalancerUrl, "mongo"]]
+        PostDatabasePort: 80
+        Listener: !GetAtt ALB.Outputs.Listener
+        Path: /post
+
+  UiService:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: https://s3.amazonaws.com/cf-template-structured/services/reddit-ui-service.yaml
+      Parameters:
+        VPC: !GetAtt VPC.Outputs.VPC
+        Cluster: !GetAtt ECS.Outputs.Cluster
+        DesiredCount: 1
+        PostServiceUrl:
+          !Join ["/", [!GetAtt ALB.Outputs.LoadBalancerUrl, "post"]]
+        PostServicePort: 80 
+        Listener: !GetAtt ALB.Outputs.Listener
+        Path: /
+        ECSServiceAutoScalingRoleARN: !GetAtt ECS.Outputs.ECSServiceAutoScalingRole
+
+Outputs:
+  MongoServiceUrl:
+    Description: The URL endpoint for the Reddit Mongo service
+    Value: !Join ["/", [!GetAtt ALB.Outputs.LoadBalancerUrl, "mongo"]]
+
+  PostServiceUrl:
+    Description: The URL endpoint for the Reddit Post service
+    Value: !Join ["/", [!GetAtt ALB.Outputs.LoadBalancerUrl, "post"]]
+
+  UiServiceUrl:
+    Description: The URL endpoint for Reddit UI service
+    Value: !Join ["", [!GetAtt ALB.Outputs.LoadBalancerUrl, "/"]]
